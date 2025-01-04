@@ -10,5 +10,4 @@ app.use(cors())
 
 app.use('/user',user_router)
 
-// this is a comment
 app.listen(process.env.PORT)
