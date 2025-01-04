@@ -4,6 +4,7 @@ import { pool } from '../config/db.js'; // Ensure this is your SQL Server pool
 import nodemailer from 'nodemailer';
 import bcrypt from 'bcryptjs';
 import validator from 'email-validator';
+import jwt from 'jsonwebtoken'
 
 const user_router = express.Router();
 
@@ -89,7 +90,7 @@ const htmlEmailTemplate = `
         <p>Thank you for registering with us. To complete your registration, please enter the following 6-digit verification code:</p>
         <div class="verification-code">{{verificationCode}}</div>
         <p>This code will expire in 10 minutes. If you did not request this verification code, please ignore this email.</p>
-        <a href="http://localhost:3200/user/verify" class="cta-button">Verify Your Email</a>
+        <a href="http://192.168.1.194:3000/signup/verify" class="cta-button">Verify Your Email</a>
       </div>
       <div class="footer">
         <p>&copy; ${new Date().getFullYear()} Systomat Solutions. All rights reserved.</p>
@@ -231,5 +232,27 @@ user_router.post('/verify', async (req, res) => {
     return res.status(500).json({ message: 'Internal server error' });
   }
 });
+
+user_router.post('/signin', async (req, res) => {
+  try {
+    const { email, password } = req.body
+    const result = await pool.request().input('email', email).input('password', password).query(`select email from users where email=@email`)
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ message: 'User not registered' })
+    }
+    else {
+     const token= jwt.sign({
+        email, name:result.recordset[0].name
+      }, process.env.SECRET_KEY)
+      return res.status(200).json({token})
+
+    }
+
+  }
+  catch (e) {
+    return res.status(500).json(e)
+
+  }
+})
 
 export default user_router;
