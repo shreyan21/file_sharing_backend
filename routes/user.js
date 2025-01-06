@@ -5,6 +5,7 @@ import nodemailer from 'nodemailer';
 import bcrypt from 'bcryptjs';
 import validator from 'email-validator';
 import jwt from 'jsonwebtoken'
+import { accessSync } from 'fs';
 
 const user_router = express.Router();
 
@@ -108,11 +109,11 @@ user_router.post('/add', async (req, res) => {
 
   try {
     // Validate input
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Name, email, and password are required' });
-    }
+    // if (!name || !email || !password) {
+    //   return res.status(400).json({ message: 'Name, email, and password are required' });
+    // }
 
-    // Check email format
+    // Check email forma t
     if (!validator.validate(email)) {
       return res.status(400).json({ message: 'Invalid email format' });
     }
@@ -177,6 +178,13 @@ user_router.post('/add', async (req, res) => {
       html: htmlEmailTemplate.replace('{{name}}', name).replace('{{verificationCode}}', verificationCode),
     });
 
+    setTimeout(async () => {
+      await pool.request()
+        .input('email', email)
+        .query('DELETE FROM email_verifications WHERE email = @email');
+
+    },5*60*1000)
+
     return res.status(200).json({ message: 'Verification code sent to email' });
   } catch (err) {
     console.error(err);
@@ -184,13 +192,14 @@ user_router.post('/add', async (req, res) => {
   }
 });
 
+
 user_router.post('/verify', async (req, res) => {
   const { name, email, phone, password, verification_code } = req.body;
 
   try {
     // Validate input
     if (!name || !email || !password || !verification_code) {
-      return res.status(400).json({ message: 'All fields are required' });
+      return res.status(400).json({ message: 'Invalid verification code' });
     }
 
     // Verify the email and code from the email_verifications table
@@ -238,13 +247,18 @@ user_router.post('/signin', async (req, res) => {
     const { email, password } = req.body
     const result = await pool.request().input('email', email).input('password', password).query(`select email from users where email=@email`)
     if (result.recordset.length === 0) {
+
       return res.status(404).json({ message: 'User not registered' })
     }
+    else if (result.recordset[0].email) {
+      return res.status(401).json({ message: 'Invalid credentials' })
+    }
+
     else {
-     const token= jwt.sign({
-        email, name:result.recordset[0].name
+      const token = jwt.sign({
+        email, name: result.recordset[0].name
       }, process.env.SECRET_KEY)
-      return res.status(200).json({token})
+      return res.status(200).json({ token })
 
     }
 
