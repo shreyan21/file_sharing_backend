@@ -192,6 +192,7 @@ user_router.post('/add', async (req, res) => {
 });
 
 
+
 user_router.post('/verify', async (req, res) => {
   const { name, email, phone, password, verification_code } = req.body;
 
