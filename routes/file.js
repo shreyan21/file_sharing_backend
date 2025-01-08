@@ -39,9 +39,9 @@ const ftpCredentials = {
     passive: true
 };
 
-if (!fs.existsSync("./uploads")) {
-    fs.mkdirSync("./uploads");
-}
+// if (!fs.existsSync("./uploads")) {
+//     fs.mkdirSync("./uploads");
+// }
 
 file_route.post("/upload", upload.single("file"), async (req, res) => {
     if (!req.file) {
@@ -187,7 +187,7 @@ file_route.get('/files/:filename', async (req, res) => {
         // Send the file size as a header to the client
         const fileStats = await client.size(filePath);
         res.setHeader('Content-Length', fileStats);
-
+ 
         // Stream the file directly to the response (client)
         await client.downloadTo(res, filePath);
 
