@@ -104,7 +104,7 @@ const htmlEmailTemplate = `
 
 // POST Route to Add User and Send Verification Code
 user_router.post('/add', async (req, res) => {
-  const { name, email, phone, password } = req.body;
+  const { name, email } = req.body;
 
   try {
     // Validate input
@@ -198,8 +198,8 @@ user_router.post('/verify', async (req, res) => {
 
   try {
     // Validate input
-    if (!name || !email || !password || !verification_code) {
-      return res.status(400).json({ message: 'Invalid verification code' });
+    if (!verification_code) {
+      return res.status(400).json({ message: 'No verification code provided' });
     }
 
     // Verify the email and code from the email_verifications table
@@ -224,10 +224,10 @@ user_router.post('/verify', async (req, res) => {
       .input('email', email)
       .input('phone', phone || null) // Insert phone if provided, otherwise NULL
       .input('password', hashedPassword)
-      .input('permissions', 'can_read') // Default permissions
+    
       .query(`
-        INSERT INTO users (name, email, phone, password, permissions)
-        VALUES (@name, @email, @phone, @password, @permissions)
+        INSERT INTO users (name, email, phone, password)
+        VALUES (@name, @email, @phone, @password)
       `);
 
     // Remove the verification record after user is successfully added
