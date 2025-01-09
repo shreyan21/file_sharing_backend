@@ -4,7 +4,7 @@ import dotenv from 'dotenv'
 dotenv.config()
 const authenticate = async (req, res, next) => {
     try {
-        const { usertoken } = req.headers.authorisation
+        const { usertoken } = req.headers
        
         const decode=jwt.verify(usertoken,process.env.SECRET_KEY)
         console.log(decode)

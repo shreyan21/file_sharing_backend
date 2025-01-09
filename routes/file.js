@@ -27,7 +27,7 @@ const storage = multer.diskStorage({
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
-        cb(null,  file.originalname);
+        cb(null, file.originalname);
     }
 });
 
@@ -44,7 +44,7 @@ const ftpCredentials = {
 //     fs.mkdirSync("./uploads");
 // }
 
-file_route.post("/upload", upload.single("file"), async (req, res) => {
+file_route.post("/upload", [authenticate, upload.single("file")], async (req, res) => {
     if (!req.file) {
         return res.status(400).send("No file uploaded.");
     }
@@ -80,6 +80,15 @@ file_route.post("/upload", upload.single("file"), async (req, res) => {
         await client.access(ftpCredentials);
 
         // Upload the file from local to remote FTP server
+        const list = await client.list("/files")
+        const filenames = list.map(file => file.filename || file.name);  // Modify this as per the actual response structure
+
+        // Check if the file already exists
+        const fileExists = filenames.some(e => e === req.file.filename);  // 'some' is more efficient than 'filter'
+
+        if (fileExists) {
+            return res.status(409).json({ message: 'File with this name is already present' });
+        }
         await client.uploadFrom(localfilepath, remotefilepath);
 
         // Insert file details into the filestorage table
@@ -168,7 +177,7 @@ file_route.post("/update", async (req, res) => {
         .input('file', file)
         .input('email', email)
         .query('SELECT uploaded_by FROM filestorage WHERE filename = @file');
-    
+
     if (fileCheck.recordset.length === 0) {
         return res.status(401).send("File not found or you are not authorized to update this file.");
     }
