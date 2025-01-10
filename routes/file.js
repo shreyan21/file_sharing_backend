@@ -50,9 +50,9 @@ file_route.post("/upload", [authenticate, upload.single("file")], async (req, re
     }
 
     const result = await pool.request().input('email', req.body.email).query('SELECT email FROM users WHERE email = @email');
-    if (result.recordset.length === 0) {
-        return res.status(401).json({ message: 'User not registered' });
-    }
+    // if (result.recordset.length === 0) {
+    //     return res.status(401).json({ message: 'User not registered' });
+    // }
 
     const localfilepath = path.join(__dirname, "uploads", req.file.filename);
     const remotefilepath = path.join("files/", `${req.file.filename}`);
@@ -217,7 +217,8 @@ file_route.get('/showfile/:filename', authenticate, async (req, res) => {
             return res.status(404).send('File not found on FTP server');
         }
 
-        // Set MIME type for the file based on extension (image, pdf, etc.)
+        // Set MIME type for the file based o
+        // n extension (image, pdf, etc.)
         const mimeType = mime.lookup(filename) || 'application/octet-stream';  // Default MIME type if none is found
         res.setHeader('Content-Type', mimeType);
 

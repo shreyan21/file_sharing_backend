@@ -107,10 +107,7 @@ user_router.post('/add', async (req, res) => {
   const { name, email } = req.body;
 
   try {
-    // Validate input
-    // if (!name || !email || !password) {
-    //   return res.status(400).json({ message: 'Name, email, and password are required' });
-    // }
+   
 
     // Check email forma t
     if (!validator.validate(email)) {
