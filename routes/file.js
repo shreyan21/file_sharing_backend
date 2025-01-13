@@ -186,6 +186,7 @@ file_route.get('/showfiles', authenticate, async (req, res) => {
             modifiedDate: file.modifiedAt, // Last modified date
             isDirectory: file.isDirectory, // Whether it is a directory
         }));
+        
 
         // Return the file metadata to the frontend
         return res.status(200).json({ files });
@@ -240,6 +241,10 @@ file_route.get('/showfile/:filename', authenticate, async (req, res) => {
         client.close();
     }
 });
+
+
+
+
 
 file_route.delete('/removefile/:filename', authenticate, async (req, res) => {
     const { filename } = req.params;

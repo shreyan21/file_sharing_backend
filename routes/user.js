@@ -253,6 +253,8 @@ user_router.post('/signin', async (req, res) => {
         const token = jwt.sign({
           email, name: result.recordset[0].name
         }, process.env.SECRET_KEY)
+
+        // const permission=await pool.request().input('email',email).query('Select * from file_permissions where email=@email')
         return res.status(200).json({ token })
       }
       return res.status(401).json({ message: 'Invalid credentials' })
