@@ -31,7 +31,7 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ storage });
+const upload = multer({ storage }); 
 const ftpCredentials = {
     host: `${process.env.FTP_HOST}`,
     user: `${process.env.FTP_USER}`,
@@ -225,12 +225,27 @@ file_route.get('/showfile/:filename', authenticate, async (req, res) => {
         const mimeType = mime.lookup(filename) || 'application/octet-stream';  // Default MIME type if none is found
         res.setHeader('Content-Type', mimeType);
 
-        // Send the file size as a header to the client
-        const fileStats = await client.size(filePath);
-        res.setHeader('Content-Length', fileStats);
+        // For text files, read the first 200 characters for preview (if it's a text file)
+        if (mimeType === 'text/plain') {
+            const textStream = await client.downloadToBuffer(filePath);
+            const textSnippet = textStream.toString('utf-8').slice(0, 200); // Read the first 200 characters
+            return res.status(200).json({ preview: textSnippet });
+        }
 
-        // Stream the file directly to the response (client)
-        await client.downloadTo(res, filePath);
+        // For image files, send the file as a blob
+        if (mimeType.startsWith('image/')) {
+            await client.downloadTo(res, filePath); // Image content sent directly
+            return;
+        }
+
+        // For PDF files, send the file as an object or stream it
+        if (mimeType === 'application/pdf') {
+            await client.downloadTo(res, filePath); // PDF content sent directly
+            return;
+        }
+
+        // Default response for unsupported files
+        return res.status(415).send('Unsupported file type for preview');
 
     } catch (error) {
         console.error('Error fetching file from FTP server:', error);
@@ -242,6 +257,7 @@ file_route.get('/showfile/:filename', authenticate, async (req, res) => {
         client.close();
     }
 });
+
 
 
 
