@@ -198,10 +198,13 @@ file_route.get('/showfiles', authenticate, async (req, res) => {
         client.close();
     }
 });
+
+
+
 file_route.get('/showfile/:filename', authenticate, async (req, res) => {
     const { filename } = req.params;
     const client = new ftp.Client();
-    client.ftp.verbose = true;
+    client.ftp.verbose = true;  // Optional: Enable verbose logging for debugging
 
     try {
         // Connect to the FTP server
@@ -218,8 +221,7 @@ file_route.get('/showfile/:filename', authenticate, async (req, res) => {
             return res.status(404).send('File not found on FTP server');
         }
 
-        // Set MIME type for the file based o
-        // n extension (image, pdf, etc.)
+        // Set the correct MIME type based on file extension
         const mimeType = mime.lookup(filename) || 'application/octet-stream';  // Default MIME type if none is found
         res.setHeader('Content-Type', mimeType);
 
@@ -232,7 +234,6 @@ file_route.get('/showfile/:filename', authenticate, async (req, res) => {
 
     } catch (error) {
         console.error('Error fetching file from FTP server:', error);
-        // Make sure the response is only sent once
         if (!res.headersSent) {
             return res.status(500).send('Error fetching file from FTP server');
         }
@@ -241,8 +242,6 @@ file_route.get('/showfile/:filename', authenticate, async (req, res) => {
         client.close();
     }
 });
-
-
 
 
 
