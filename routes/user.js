@@ -89,7 +89,7 @@ const htmlEmailTemplate = `
         <p>Hello <strong>{{name}}</strong>,</p>
         <p>Thank you for registering with us. To complete your registration, please enter the following 6-digit verification code:</p>
         <div class="verification-code">{{verificationCode}}</div>
-        <p>This code will expire in 10 minutes. If you did not request this verification code, please ignore this email.</p>
+        <p>This code will expire in 5 minutes. If you did not request this verification code, please ignore this email.</p>
         <a href="http://192.168.1.194:3000/signup/verify" class="cta-button">Verify Your Email</a>
       </div>
       <div class="footer">
