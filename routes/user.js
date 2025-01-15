@@ -5,6 +5,7 @@ import nodemailer from 'nodemailer';
 import bcrypt from 'bcryptjs';
 import validator from 'email-validator';
 import jwt from 'jsonwebtoken'
+import { log } from 'console';
 
 const user_router = express.Router();
 
@@ -107,7 +108,7 @@ user_router.post('/add', async (req, res) => {
   const { name, email } = req.body;
 
   try {
-   
+
 
     // Check email forma t
     if (!validator.validate(email)) {
@@ -221,7 +222,7 @@ user_router.post('/verify', async (req, res) => {
       .input('email', email)
       .input('phone', phone || null) // Insert phone if provided, otherwise NULL
       .input('password', hashedPassword)
-    
+
       .query(`
         INSERT INTO users (name, email, phone, password)
         VALUES (@name, @email, @phone, @password)
@@ -254,20 +255,49 @@ user_router.post('/signin', async (req, res) => {
           email, name: result.recordset[0].name
         }, process.env.SECRET_KEY)
 
-        // const permission=await pool.request().input('email',email).query('Select * from file_permissions where email=@email')
-        return res.status(200).json({ token })
+
+        const data = await pool.request()
+          .input('email', email).query(
+            'select can_read,can_edit,can_download,file_name from file_permissions where user_email=@email'
+          )
+
+        let permissionsObject = []
+      
+        if (data.recordset.length !== 0)
+          for (let element of data.recordset) {
+
+
+
+            const { can_read, can_edit, can_download } = element
+
+
+            if (can_download.trim() === "YES") {
+              permissionsObject.push({ file_name: `${element.file_name}`, can_download: "YES" })
+            }
+            if (can_edit.trim() === "YES") {
+              permissionsObject.push({ file_name: `${element.file_name}`,can_edit: "YES" })
+            }
+            if (can_read.trim()=== "YES") {
+              permissionsObject.push({ file_name: `${element.file_name}`, can_read: "YES"})
+            }
+
+          }
+
+        
+
+        return res.status(200).json({ token, permissionsObject })
       }
       return res.status(401).json({ message: 'Invalid credentials' })
     }
 
 
 
-
   }
+  
   catch (e) {
-    return res.status(500).json(e)
+      return res.status(500).json(e)
 
-  }
-})
+    }
+  })
 
 export default user_router;

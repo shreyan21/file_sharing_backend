@@ -127,18 +127,18 @@ file_route.post("/upload", [authenticate, upload.single("file")], async (req, re
         if (can_edit.length > 0) {
             await setPermissions(can_edit, 'can_edit', 'YES');
             await setPermissions(can_edit, 'can_read', 'YES');
-            await setPermissions(can_edit, 'can_download', 'YES');
+            await setPermissions(can_edit, 'can_download', 'NO');
         }
 
-        // Step 2: Set permissions for users in the can_download array (but not in can_edit)
+        // Step 2: Set permissions for users in the can_download array 
         const canDownloadNotEdit = can_download.filter(email => !can_edit.includes(email));
         if (canDownloadNotEdit.length > 0) {
             await setPermissions(canDownloadNotEdit, 'can_read', 'YES');
             await setPermissions(canDownloadNotEdit, 'can_download', 'YES');
-            await setPermissions(canDownloadNotEdit, 'can_edit', 'NO');
+            await setPermissions(canDownloadNotEdit, 'can_edit', 'YES');
         }
 
-        // Step 3: Set permissions for users in the can_read array (but not in can_edit or can_download)
+        // Step 3: Set permissions for users in the can_read array
         const canReadNotEditOrDownload = can_read.filter(email => !can_edit.includes(email) && !can_download.includes(email));
         if (canReadNotEditOrDownload.length > 0) {
             await setPermissions(canReadNotEditOrDownload, 'can_read', 'YES');
