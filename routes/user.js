@@ -271,7 +271,7 @@ user_router.post('/signin', async (req, res) => {
             const { can_read, can_edit, can_download } = element
 
 
-            if (can_download.trim() === "YES") {
+            if (can_download.trim() === "YES") {       
               permissionsObject.push({ file_name: `${element.file_name}`, can_download: "YES" })
             }
             if (can_edit.trim() === "YES") {
