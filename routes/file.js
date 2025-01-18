@@ -43,6 +43,34 @@ const ftpCredentials = {
 // if (!fs.existsSync("./uploads")) {
 //     fs.mkdirSync("./uploads");
 // }
+const getFileType = (filename) => {
+    const ext = filename.split('.').pop().toLowerCase();
+    switch (ext) {
+      case 'pdf': return 'pdf';
+      case 'jpg':
+      case 'jpeg': return 'image';
+      case 'png': return 'image';
+      case 'txt': return 'text';
+      case 'doc':
+      case 'docx': return 'word';
+      case 'mp3': return 'audio';
+      case 'mp4': return 'video';
+      default: return 'file'; // Default for unknown file types
+    }
+  }
+  
+  // Function to assign an icon based on file type
+  const getFileIcon = (fileType) => {
+    switch (fileType) {
+      case 'pdf': return '📄'; // PDF icon
+      case 'image': return '🖼️'; // Image icon
+      case 'text': return '📃'; // Text file icon
+      case 'word': return '📑'; // Word document icon
+      case 'audio': return '🎵'; // Audio file icon
+      case 'video': return '🎥'; // Video file icon
+      default: return '📁'; // Default file icon
+    }
+  }
 
 file_route.post("/upload", [authenticate, upload.single("file")], async (req, res) => {
     if (!req.file) {
@@ -180,12 +208,21 @@ file_route.get('/showfiles', authenticate, async (req, res) => {
         const fileList = await client.list('files/');
 
         // Prepare file metadata (name, size, etc.)
-        const files = fileList.map(file => ({
-            name: file.name,   // Name of the file
-            size: file.size,   // Size of the file in bytes
-            modifiedDate: file.modifiedAt, // Last modified date
-            isDirectory: file.isDirectory, // Whether it is a directory
-        }));
+        
+        const files = fileList
+            .filter(file => !file.isDirectory)  // Filter out directories
+            .map(file => {
+                const fileType = getFileType(file.name); // Get the type based on the file extension
+                const icon = getFileIcon(fileType); // Get the appropriate icon for the file type
+               const fileSizeInKb=(file.size/1024).toFixed(2)
+                return {
+                    name: file.name,  // Name of the file
+                    size: fileSizeInKb,  // Size of the file in bytes
+                    modifiedDate: file.date,  // Last modified date
+                    type: fileType,   // Type inferred from the 
+                    icon: icon,       // Corresponding icon for the fil
+                };
+            });
         
 
         // Return the file metadata to the frontend
@@ -273,7 +310,7 @@ file_route.delete('/removefile/:filename', authenticate, async (req, res) => {
         }
         await pool.request().input('filename', filename).query('delete from filestorage where filename=@filename')
         await client.remove(remotefilepath)
-        return res.status(200).json({ message: 'File removed' })
+        return res.status(200).json({ message: 'File removed' , deletedFile:filename})
     }
     catch (e) {
         return res.status(500).json({ message: 'Error deleting file' })
