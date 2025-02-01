@@ -207,25 +207,8 @@ file_route.get('/showfiles', authenticate, async (req, res) => {
         // List all files in the 'files/' directory
         const fileList = await client.list('files/');
 
-        // Prepare file metadata (name, size, etc.)
-        
-        const files = fileList
-            .filter(file => !file.isDirectory)  // Filter out directories
-            .map(file => {
-                const fileType = getFileType(file.name); // Get the type based on the file extension
-                const icon = getFileIcon(fileType); // Get the appropriate icon for the file type
-               const fileSizeInKb=(file.size/1024).toFixed(2)
-                return {
-                    name: file.name,  // Name of the file
-                    size: fileSizeInKb,  // Size of the file in bytes
-                    modifiedDate: file.date,  // Last modified date
-                    type: fileType,   // Type inferred from the 
-                    icon: icon,       // Corresponding icon for the fil
-                };
-            });
-        
-
-        // Return the file metadata to the frontend
+      
+         const files=fileList.map(file=>file.name)
         return res.status(200).json({ files });
 
     } catch (error) {
@@ -238,65 +221,81 @@ file_route.get('/showfiles', authenticate, async (req, res) => {
 
 
 
-file_route.get('/showfile/:filename', authenticate, async (req, res) => {
-    const { filename } = req.params;
-    const client = new ftp.Client();
-    client.ftp.verbose = true;  // Optional: Enable verbose logging for debugging
+// file_route.get('/showfile/:filename', authenticate, async (req, res) => {
+//     const { filename } = req.params;
+//     const client = new ftp.Client();
+//     client.ftp.verbose = true;  // Optional: Enable verbose logging for debugging
 
-    try {
-        // Connect to the FTP server
-        await client.access(ftpCredentials);
+//     try {
+//         // Connect to the FTP server
+//         await client.access(ftpCredentials);
 
-        // Define the file path on the FTP server
-        const filePath = `files/${filename}`;
+//         // Define the file path on the FTP server
+//         const filePath = `files/${filename}`;
 
-        // Check if the file exists by trying to list the files in the directory
-        const fileList = await client.list('files');
-        const fileExists = fileList.some(file => file.name === filename);
+//         // Check if the file exists by trying to list the files in the directory
+//         const fileList = await client.list('files');
+//         const fileExists = fileList.some(file => file.name === filename);
 
-        if (!fileExists) {
-            return res.status(404).send('File not found on FTP server');
-        }
+//         if (!fileExists) {
+//             return res.status(404).send('File not found on FTP server');
+//         }
 
-        // Set the correct MIME type based on file extension
-        const mimeType = mime.lookup(filename) || 'application/octet-stream';  // Default MIME type if none is found
-        res.setHeader('Content-Type', mimeType);
+//         // Set the correct MIME type based on file extension
+//         const mimeType = mime.lookup(filename) || 'application/octet-stream';  // Default MIME type if none is found
+//         res.setHeader('Content-Type', mimeType);
 
-        // For text files, read the first 200 characters for preview (if it's a text file)
-        if (mimeType === 'text/plain') {
-            const textStream = await client.downloadToBuffer(filePath);
-            const textSnippet = textStream.toString('utf-8').slice(0, 200); // Read the first 200 characters
-            return res.status(200).json({ preview: textSnippet });
-        }
+//         // For text files, read the first 200 characters for preview (if it's a text file)
+//         if (mimeType === 'text/plain') {
+//             const textStream = await client.downloadToBuffer(filePath);
+//             const textSnippet = textStream.toString('utf-8').slice(0, 200); // Read the first 200 characters
+//             return res.status(200).json({ preview: textSnippet });
+//         }
 
-        // For image files, send the file as a blob
-        if (mimeType.startsWith('image/')) {
-            await client.downloadTo(res, filePath); // Image content sent directly
-            return;
-        }
+//         // For image files, send the file as a blob
+//         if (mimeType.startsWith('image/')) {
+//             await client.downloadTo(res, filePath); // Image content sent directly
+//             return;
+//         }
 
-        // For PDF files, send the file as an object or stream it
-        if (mimeType === 'application/pdf') {
-            await client.downloadTo(res, filePath); // PDF content sent directly
-            return;
-        }
+//         // For PDF files, send the file as an object or stream it
+//         if (mimeType === 'application/pdf') {
+//             await client.downloadTo(res, filePath); // PDF content sent directly
+//             return;
+//         }
 
-        // Default response for unsupported files
-        return res.status(415).send('Unsupported file type for preview');
+//         // Default response for unsupported files
+//         return res.status(415).send('Unsupported file type for preview');
 
-    } catch (error) {
-        console.error('Error fetching file from FTP server:', error);
-        if (!res.headersSent) {
-            return res.status(500).send('Error fetching file from FTP server');
-        }
-    } finally {
-        // Always close the FTP client
-        client.close();
-    }
-});
+//     } catch (error) {
+//         console.error('Error fetching file from FTP server:', error);
+//         if (!res.headersSent) {
+//             return res.status(500).send('Error fetching file from FTP server');
+//         }
+//     } finally {
+//         // Always close the FTP client
+//         client.close();
+//     }
+// });
 
 
 
+file_route.get('/showfiles/:name', async (req, res) => {
+    const client = new ftp.Client()
+    await client.access(ftpCredentials)
+    const folderpath=path.join(__dirname,'uploads')
+    await client.downloadTo(path.join(folderpath,req.params.name),path.join('files/',req.params.name))
+    const filePath=path.join(folderpath,req.params.name)
+    const fileStream = fs.createReadStream(filePath);
+    const mimeType = getFileType(req.params.name);
+    res.setHeader('Content-Disposition', 'inline'); 
+    res.setHeader('Content-Type', mimeType);
+    fileStream.pipe(res);
+   fileStream.on('end',()=>{
+    fs.unlinkSync(filePath)
+   })
+
+})
 
 file_route.delete('/removefile/:filename', authenticate, async (req, res) => {
     const { filename } = req.params;
