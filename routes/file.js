@@ -196,30 +196,30 @@ file_route.post("/upload", [authenticate, upload.single("file")], async (req, re
 
 
 
-file_route.get('/showfiles', authenticate, async (req, res) => {
+// Modify the /showfiles endpoint to return rich metadata
+file_route.get('/showfiles', async (req, res) => {
     const client = new ftp.Client();
-    client.ftp.verbose = true;
-
     try {
-        // Connect to the FTP server
         await client.access(ftpCredentials);
+        const files = await client.list('/files');
+        
+        // Enhanced metadata response
+        const fileData = files.map(file => ({
+            filename: file.name,
+            type: getFileType(file.name),
+            icon: getFileIcon(getFileType(file.name)),
+            size: file.size,
+            modified: file.modifiedAt || file.date
+        }));
 
-        // List all files in the 'files/' directory
-        const fileList = await client.list('files/');
-
-      
-         const files=fileList.map(file=>file.name)
-        return res.status(200).json({ files });
-
-    } catch (error) {
-        console.error('Error fetching files from FTP server:', error);
-        return res.status(500).send('Error fetching files');
+        res.json(fileData);
+    } catch (err) {
+        console.error('Error fetching file list:', err);
+        res.status(500).json({ error: 'Error fetching file list' });
     } finally {
         client.close();
     }
 });
-
-
 
 // file_route.get('/showfile/:filename', authenticate, async (req, res) => {
 //     const { filename } = req.params;
@@ -280,22 +280,37 @@ file_route.get('/showfiles', authenticate, async (req, res) => {
 
 
 
-file_route.get('/showfiles/:name', async (req, res) => {
-    const client = new ftp.Client()
-    await client.access(ftpCredentials)
-    const folderpath=path.join(__dirname,'uploads')
-    await client.downloadTo(path.join(folderpath,req.params.name),path.join('files/',req.params.name))
-    const filePath=path.join(folderpath,req.params.name)
-    const fileStream = fs.createReadStream(filePath);
-    const mimeType = getFileType(req.params.name);
-    res.setHeader('Content-Disposition', 'inline'); 
-    res.setHeader('Content-Type', mimeType);
-    fileStream.pipe(res);
-   fileStream.on('end',()=>{
-    fs.unlinkSync(filePath)
-   })
-
-})
+file_route.get('/showfiles/:filename', async (req, res) => {
+    const client = new ftp.Client();
+    try {
+      await client.access(ftpCredentials);
+      const folderpath = path.join(__dirname, 'temp');
+      
+      if (!fs.existsSync(folderpath)) {
+        fs.mkdirSync(folderpath);
+      }
+  
+      const localFilePath = path.join(folderpath, req.params.filename);
+      await client.downloadTo(localFilePath, `/files/${req.params.filename}`);
+  
+      const mimeType = mime.lookup(req.params.filename) || 'application/octet-stream';
+      
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', 'inline');
+  
+      const fileStream = fs.createReadStream(localFilePath);
+      fileStream.pipe(res);
+  
+      fileStream.on('end', () => fs.unlinkSync(localFilePath));
+      fileStream.on('error', () => fs.unlinkSync(localFilePath));
+      
+    } catch (err) {
+      console.error('Error fetching file:', err);
+      res.status(500).send('Error fetching file');
+    } finally {
+      client.close();
+    }
+  });
 
 file_route.delete('/removefile/:filename', authenticate, async (req, res) => {
     const { filename } = req.params;
