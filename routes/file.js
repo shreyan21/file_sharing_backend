@@ -40,9 +40,9 @@ const ftpCredentials = {
     passive: true
 };
 
-// if (!fs.existsSync("./uploads")) {
-//     fs.mkdirSync("./uploads");
-// }
+if (!fs.existsSync("./uploads")) {
+    fs.mkdirSync("./uploads");
+}
 const getFileType = (filename) => {
     const ext = filename.split('.').pop().toLowerCase();
     switch (ext) {
@@ -211,6 +211,7 @@ file_route.get('/showfiles', async (req, res) => {
             size: file.size,
             modified: file.modifiedAt || file.date
         }));
+        
 
         res.json(fileData);
     } catch (err) {
@@ -221,74 +222,60 @@ file_route.get('/showfiles', async (req, res) => {
     }
 });
 
-// file_route.get('/showfile/:filename', authenticate, async (req, res) => {
-//     const { filename } = req.params;
-//     const client = new ftp.Client();
-//     client.ftp.verbose = true;  // Optional: Enable verbose logging for debugging
+// Rename File Endpoint
+file_route.put('/rename/:filename', authenticate, async (req, res) => {
+    const { newName } = req.body;
+    const { filename } = req.params;
+    const client = new ftp.Client();
 
-//     try {
-//         // Connect to the FTP server
-//         await client.access(ftpCredentials);
+    try {
+        // Verify new name validity
+        if (!newName || newName.includes('/')) {
+            return res.status(400).json({ error: 'Invalid file name' });
+        }
 
-//         // Define the file path on the FTP server
-//         const filePath = `files/${filename}`;
+        await client.access(ftpCredentials);
+        
+        // Check if new name exists
+        const files = await client.list('/files');
+        if (files.some(f => f.name === newName)) {
+            return res.status(409).json({ error: 'File name already exists' });
+        }
 
-//         // Check if the file exists by trying to list the files in the directory
-//         const fileList = await client.list('files');
-//         const fileExists = fileList.some(file => file.name === filename);
+        // Rename on FTP server
+        await client.rename(`/files/${filename}`, `/files/${newName}`);
 
-//         if (!fileExists) {
-//             return res.status(404).send('File not found on FTP server');
-//         }
+        // Update database records
+        await pool.request()
+            .input('oldName', filename)
+            .input('newName', newName)
+            .query(`
+                UPDATE filestorage
+                SET filename = @newName
+                WHERE filename = @oldName;
 
-//         // Set the correct MIME type based on file extension
-//         const mimeType = mime.lookup(filename) || 'application/octet-stream';  // Default MIME type if none is found
-//         res.setHeader('Content-Type', mimeType);
-
-//         // For text files, read the first 200 characters for preview (if it's a text file)
-//         if (mimeType === 'text/plain') {
-//             const textStream = await client.downloadToBuffer(filePath);
-//             const textSnippet = textStream.toString('utf-8').slice(0, 200); // Read the first 200 characters
-//             return res.status(200).json({ preview: textSnippet });
-//         }
-
-//         // For image files, send the file as a blob
-//         if (mimeType.startsWith('image/')) {
-//             await client.downloadTo(res, filePath); // Image content sent directly
-//             return;
-//         }
-
-//         // For PDF files, send the file as an object or stream it
-//         if (mimeType === 'application/pdf') {
-//             await client.downloadTo(res, filePath); // PDF content sent directly
-//             return;
-//         }
-
-//         // Default response for unsupported files
-//         return res.status(415).send('Unsupported file type for preview');
-
-//     } catch (error) {
-//         console.error('Error fetching file from FTP server:', error);
-//         if (!res.headersSent) {
-//             return res.status(500).send('Error fetching file from FTP server');
-//         }
-//     } finally {
-//         // Always close the FTP client
-//         client.close();
-//     }
-// });
-
-
+                UPDATE file_permissions
+                SET file_name = @newName
+                WHERE file_name = @oldName;
+            `);
+        res.json({ message: 'File renamed successfully', newName });
+    } catch (err) {
+        console.error('Renaming error:', err);
+        res.status(500).json({ error: 'Error renaming file' });
+    } finally {
+        client.close();
+    }
+});
 
 file_route.get('/showfiles/:filename', async (req, res) => {
     const client = new ftp.Client();
     try {
       await client.access(ftpCredentials);
-      const folderpath = path.join(__dirname, 'temp');
+      const folderpath = path.join(__dirname, 'uploads');
       
-      if (!fs.existsSync(folderpath)) {
-        fs.mkdirSync(folderpath);
-      }
+    //   if (!fs.existsSync(folderpath)) {
+    //     fs.mkdirSync(folderpath);
+    //   }
   
       const localFilePath = path.join(folderpath, req.params.filename);
       await client.downloadTo(localFilePath, `/files/${req.params.filename}`);
@@ -323,7 +310,7 @@ file_route.delete('/removefile/:filename', authenticate, async (req, res) => {
             return res.status(404).json({ message: 'File not found' })
         }
         await pool.request().input('filename', filename).query('delete from filestorage where filename=@filename')
-        await client.remove(remotefilepath)
+        await client.remove(remotefilepath) 
         return res.status(200).json({ message: 'File removed' , deletedFile:filename})
     }
     catch (e) {
