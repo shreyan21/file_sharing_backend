@@ -125,6 +125,7 @@ file_route.post("/upload", [authenticate, upload.single("file")], async (req, re
             .input('filename', req.file.filename)
             .query('INSERT INTO filestorage (filename, uploaded_by) VALUES (@filename, @uploaded_by);');
 
+        await pool.request().input('email',req.body.email).input('filename',req.file.filename).query(`insert into file_permissions(user_email,file_name,can_read,can_edit,can_download) values(@email,@filename,'YES','YES','YES')`)
         // Function to insert or update permissions for users
         const setPermissions = async (emailList, permissionType, permissionValue) => {
             for (const userEmail of emailList) {
@@ -197,7 +198,7 @@ file_route.post("/upload", [authenticate, upload.single("file")], async (req, re
 
 
 // Modify the /showfiles endpoint to return rich metadata
-file_route.get('/showfiles', async (req, res) => {
+file_route.get('/showfiles',authenticate, async (req, res) => {
     const client = new ftp.Client();
     try {
         await client.access(ftpCredentials);
@@ -212,8 +213,8 @@ file_route.get('/showfiles', async (req, res) => {
             modified: file.modifiedAt || file.date
         }));
         
-
-        res.json(fileData);
+       const result=await pool.request().input('email',req.user.email).query(`select * from file_permissions where user_email=@email`)
+        res.json({fileData,permission:result.recordset});
     } catch (err) {
         console.error('Error fetching file list:', err);
         res.status(500).json({ error: 'Error fetching file list' });

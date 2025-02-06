@@ -7,6 +7,9 @@ const authenticate = async (req, res, next) => {
         const usertoken  = req.headers.authorization
        
         const decode=jwt.verify(usertoken,process.env.SECRET_KEY)
+        req.user={
+            email:decode.email
+        }
         console.log(decode)
         next()
     }
