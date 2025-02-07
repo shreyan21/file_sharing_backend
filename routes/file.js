@@ -31,7 +31,7 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ storage }); 
+const upload = multer({ storage });
 const ftpCredentials = {
     host: `${process.env.FTP_HOST}`,
     user: `${process.env.FTP_USER}`,
@@ -46,31 +46,31 @@ if (!fs.existsSync("./uploads")) {
 const getFileType = (filename) => {
     const ext = filename.split('.').pop().toLowerCase();
     switch (ext) {
-      case 'pdf': return 'pdf';
-      case 'jpg':
-      case 'jpeg': return 'image';
-      case 'png': return 'image';
-      case 'txt': return 'text';
-      case 'doc':
-      case 'docx': return 'word';
-      case 'mp3': return 'audio';
-      case 'mp4': return 'video';
-      default: return 'file'; // Default for unknown file types
+        case 'pdf': return 'pdf';
+        case 'jpg':
+        case 'jpeg': return 'image';
+        case 'png': return 'image';
+        case 'txt': return 'text';
+        case 'doc':
+        case 'docx': return 'word';
+        case 'mp3': return 'audio';
+        case 'mp4': return 'video';
+        default: return 'file'; // Default for unknown file types
     }
-  }
-  
-  // Function to assign an icon based on file type
-  const getFileIcon = (fileType) => {
+}
+
+// Function to assign an icon based on file type
+const getFileIcon = (fileType) => {
     switch (fileType) {
-      case 'pdf': return '📄'; // PDF icon
-      case 'image': return '🖼️'; // Image icon
-      case 'text': return '📃'; // Text file icon
-      case 'word': return '📑'; // Word document icon
-      case 'audio': return '🎵'; // Audio file icon
-      case 'video': return '🎥'; // Video file icon
-      default: return '📁'; // Default file icon
+        case 'pdf': return '📄'; // PDF icon
+        case 'image': return '🖼️'; // Image icon
+        case 'text': return '📃'; // Text file icon
+        case 'word': return '📑'; // Word document icon
+        case 'audio': return '🎵'; // Audio file icon
+        case 'video': return '🎥'; // Video file icon
+        default: return '📁'; // Default file icon
     }
-  }
+}
 
 file_route.post("/upload", [authenticate, upload.single("file")], async (req, res) => {
     if (!req.file) {
@@ -125,7 +125,7 @@ file_route.post("/upload", [authenticate, upload.single("file")], async (req, re
             .input('filename', req.file.filename)
             .query('INSERT INTO filestorage (filename, uploaded_by) VALUES (@filename, @uploaded_by);');
 
-        await pool.request().input('email',req.body.email).input('filename',req.file.filename).query(`insert into file_permissions(user_email,file_name,can_read,can_edit,can_download) values(@email,@filename,'YES','YES','YES')`)
+        await pool.request().input('email', req.body.email).input('filename', req.file.filename).query(`insert into file_permissions(user_email,file_name,can_read,can_edit,can_download) values(@email,@filename,'YES','YES','YES')`)
         // Function to insert or update permissions for users
         const setPermissions = async (emailList, permissionType, permissionValue) => {
             for (const userEmail of emailList) {
@@ -198,12 +198,12 @@ file_route.post("/upload", [authenticate, upload.single("file")], async (req, re
 
 
 // Modify the /showfiles endpoint to return rich metadata
-file_route.get('/showfiles',authenticate, async (req, res) => {
+file_route.get('/showfiles', authenticate, async (req, res) => {
     const client = new ftp.Client();
     try {
         await client.access(ftpCredentials);
         const files = await client.list('/files');
-        
+
         // Enhanced metadata response
         const fileData = files.map(file => ({
             filename: file.name,
@@ -212,9 +212,10 @@ file_route.get('/showfiles',authenticate, async (req, res) => {
             size: file.size,
             modified: file.modifiedAt || file.date
         }));
-        
-       const result=await pool.request().input('email',req.user.email).query(`select * from file_permissions where user_email=@email`)
-        res.json({fileData,permission:result.recordset});
+
+        const result = await pool.request().input('email', req.user.email).query(`select * from file_permissions where user_email=@email`)
+        const result2 = await pool.request().input('email', req.user.email).query(`select filename , uploaded_by from filestorage where uploaded_by=@email`)
+        res.json({ fileData, permission: result.recordset, can_delete: result2.recordset });
     } catch (err) {
         console.error('Error fetching file list:', err);
         res.status(500).json({ error: 'Error fetching file list' });
@@ -236,7 +237,7 @@ file_route.put('/rename/:filename', authenticate, async (req, res) => {
         }
 
         await client.access(ftpCredentials);
-        
+
         // Check if new name exists
         const files = await client.list('/files');
         if (files.some(f => f.name === newName)) {
@@ -244,22 +245,31 @@ file_route.put('/rename/:filename', authenticate, async (req, res) => {
         }
 
         // Rename on FTP server
-        await client.rename(`/files/${filename}`, `/files/${newName}`);
 
         // Update database records
+        await client.rename(`/files/${filename}`, `/files/${newName}`);
         await pool.request()
             .input('oldName', filename)
             .input('newName', newName)
             .query(`
-                UPDATE filestorage
-                SET filename = @newName
-                WHERE filename = @oldName;
-
-                UPDATE file_permissions
-                SET file_name = @newName
-                WHERE file_name = @oldName;
+            UPDATE filestorage
+            SET filename = @newName
+            WHERE filename = @oldName; 
+            
+           
             `);
-        res.json({ message: 'File renamed successfully', newName });
+
+        await pool.request().input('oldName', filename)
+            .input('newName', newName)
+            .query(`
+           
+            
+            UPDATE file_permissions
+            SET file_name = @newName
+            WHERE file_name = @oldName;
+            `)
+
+        return res.json({ message: 'File renamed successfully', newName });
     } catch (err) {
         console.error('Renaming error:', err);
         res.status(500).json({ error: 'Error renaming file' });
@@ -271,34 +281,32 @@ file_route.put('/rename/:filename', authenticate, async (req, res) => {
 file_route.get('/showfiles/:filename', async (req, res) => {
     const client = new ftp.Client();
     try {
-      await client.access(ftpCredentials);
-      const folderpath = path.join(__dirname, 'uploads');
-      
-    //   if (!fs.existsSync(folderpath)) {
-    //     fs.mkdirSync(folderpath);
-    //   }
-  
-      const localFilePath = path.join(folderpath, req.params.filename);
-      await client.downloadTo(localFilePath, `/files/${req.params.filename}`);
-  
-      const mimeType = mime.lookup(req.params.filename) || 'application/octet-stream';
-      
-      res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Disposition', 'inline');
-  
-      const fileStream = fs.createReadStream(localFilePath);
-      fileStream.pipe(res);
-  
-      fileStream.on('end', () => fs.unlinkSync(localFilePath));
-      fileStream.on('error', () => fs.unlinkSync(localFilePath));
-      
+        await client.access(ftpCredentials);
+        const folderpath = path.join(__dirname, 'uploads');
+
+       
+
+        const localFilePath = path.join(folderpath, req.params.filename);
+        await client.downloadTo(localFilePath, `/files/${req.params.filename}`);
+
+        const mimeType = mime.lookup(req.params.filename) || 'application/octet-stream';
+
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', 'inline');
+
+        const fileStream = fs.createReadStream(localFilePath);
+        fileStream.pipe(res);
+
+        fileStream.on('end', () => fs.unlinkSync(localFilePath));
+        fileStream.on('error', () => fs.unlinkSync(localFilePath));
+
     } catch (err) {
-      console.error('Error fetching file:', err);
-      res.status(500).send('Error fetching file');
+        console.error('Error fetching file:', err);
+        res.status(500).send('Error fetching file');
     } finally {
-      client.close();
+        client.close();
     }
-  });
+});
 
 file_route.delete('/removefile/:filename', authenticate, async (req, res) => {
     const { filename } = req.params;
@@ -311,8 +319,8 @@ file_route.delete('/removefile/:filename', authenticate, async (req, res) => {
             return res.status(404).json({ message: 'File not found' })
         }
         await pool.request().input('filename', filename).query('delete from filestorage where filename=@filename')
-        await client.remove(remotefilepath) 
-        return res.status(200).json({ message: 'File removed' , deletedFile:filename})
+        await client.remove(remotefilepath)
+        return res.status(200).json({ message: 'File removed', deletedFile: filename })
     }
     catch (e) {
         return res.status(500).json({ message: 'Error deleting file' })
